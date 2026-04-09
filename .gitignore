@@ -137,3 +137,15 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Vite build output
+dist/
+
+# Vite cache (optional but good)
+.vite/
+
+# Mac system files
+.DS_Store
+
+# Windows system files
+Thumbs.db
