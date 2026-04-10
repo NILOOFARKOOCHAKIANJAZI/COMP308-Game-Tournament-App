@@ -1,121 +1,92 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import Container from 'react-bootstrap/Container';
+import Card from 'react-bootstrap/Card';
+
+import './App.css';
+
+import NavigationBar from './components/shared/NavigationBar.jsx';
+import ProtectedRoute from './components/shared/ProtectedRoute.jsx';
+import RoleRoute from './components/shared/RoleRoute.jsx';
+import NotFound from './components/shared/NotFound.jsx';
+
+import Home from './components/shared/Home.jsx';
+import Login from './components/auth/Login.jsx';
+import Register from './components/auth/Register.jsx';
+
+import AdminDashboard from './components/admin/AdminDashboard.jsx';
+import CreateUser from './components/admin/CreateUser.jsx';
+import CreateTournament from './components/admin/CreateTournament.jsx';
+import AssignPlayerToTournament from './components/admin/AssignPlayerToTournament.jsx';
+import PlayerList from './components/admin/PlayerList.jsx';
+import TournamentListAdmin from './components/admin/TournamentListAdmin.jsx';
+
+import PlayerDashboard from './components/player/PlayerDashboard.jsx';
+import UpcomingTournaments from './components/player/UpcomingTournaments.jsx';
+import TournamentHistory from './components/player/TournamentHistory.jsx';
+
+const PageShell = ({ title, text }) => (
+  <Container className="content-container">
+    <Card className="section-card">
+      <Card.Body>
+        <h2 className="mb-3">{title}</h2>
+        <p className="mb-0">{text}</p>
+      </Card.Body>
+    </Card>
+  </Container>
+);
+
+const UnauthorizedPage = () => (
+  <PageShell
+    title="Unauthorized"
+    text="You do not have permission to access this page."
+  />
+);
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="page-container">
+      <NavigationBar />
 
-      <div className="ticks"></div>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/home" element={<Navigate to="/" replace />} />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+        <Route element={<ProtectedRoute />}>
+          <Route
+            path="/dashboard"
+            element={
+              <PageShell
+                title="Dashboard"
+                text="Choose your portal from the navigation bar."
+              />
+            }
+          />
+
+          <Route element={<RoleRoute allowedRole="Admin" />}>
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/create-user" element={<CreateUser />} />
+            <Route path="/admin/create-tournament" element={<CreateTournament />} />
+            <Route path="/admin/assign-player" element={<AssignPlayerToTournament />} />
+            <Route path="/admin/players" element={<PlayerList />} />
+            <Route path="/admin/tournaments" element={<TournamentListAdmin />} />
+          </Route>
+
+          <Route element={<RoleRoute allowedRole="Player" />}>
+            <Route path="/player" element={<PlayerDashboard />} />
+            <Route path="/player/upcoming-tournaments" element={<UpcomingTournaments />} />
+            <Route path="/player/history" element={<TournamentHistory />} />
+          </Route>
+        </Route>
+
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </div>
+  );
 }
 
-export default App
+export default App;
