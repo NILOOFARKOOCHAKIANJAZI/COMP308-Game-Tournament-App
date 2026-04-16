@@ -22,7 +22,7 @@ variables:
 stages:
 
 # =========================
-# BUILD + SONAR & TEST + COVERAGE
+# BUILD + SONAR & TEST & COVERAGE
 # =========================
 - stage: Build
   displayName: 'Build'
