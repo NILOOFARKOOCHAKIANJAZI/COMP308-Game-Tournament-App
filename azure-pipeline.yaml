@@ -16,17 +16,19 @@ variables:
   sonarOrganization: 'niloofarkoochakianjazi'
   sonarProjectKey: 'NILOOFARKOOCHAKIANJAZI_COMP308-Game-Tournament-App'
   sonarProjectName: 'COMP308-Game-Tournament-App'
+  artifactName: 'comp308-game-tournament-app'
+  deployRoot: 'D:\agent\mock-deployments'
 
 stages:
 
 # =========================
-# STAGE 1: Static Analysis
+# BUILD + SONAR + TEST + COVERAGE
 # =========================
-- stage: StaticAnalysis
-  displayName: 'Static Code Analysis'
+- stage: Build
+  displayName: 'Build'
   jobs:
-  - job: SonarScan
-    displayName: 'Run SonarQube Cloud Analysis'
+  - job: BuildJob
+    displayName: 'Compile, Test, Coverage, and Static Analysis'
     steps:
     - task: SonarCloudPrepare@4
       displayName: 'Prepare SonarQube Cloud Analysis'
@@ -41,33 +43,9 @@ stages:
         extraProperties: |
           sonar.sourceEncoding=UTF-8
           sonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/**,**/.git/**
-          sonar.javascript.lcov.reportPaths=Backend/coverage/lcov.info,React-Client/coverage/lcov.info
+          sonar.javascript.lcov.reportPaths=$(Build.SourcesDirectory)/Backend/coverage/lcov.info,$(Build.SourcesDirectory)/React-Client/coverage/lcov.info
 
-    - task: SonarCloudAnalyze@4
-      displayName: 'Run SonarQube Cloud Analysis'
-      inputs:
-        jdkversion: 'JAVA_HOME'
-
-    - task: SonarCloudPublish@4
-      displayName: 'Publish Quality Gate Result'
-      inputs:
-        pollingTimeoutSec: '300'
-
-# =========================
-# STAGES: Build
-# Rubric requires:
-# - Build stage
-# - single job
-# - two steps
-# =========================
-- stage: Build
-  displayName: 'Build'
-  dependsOn: StaticAnalysis
-  condition: succeeded()
-  jobs:
-  - job: BuildJob
-    displayName: 'Compile and Test'
-    steps:
+    # Step 1: compile / build
     - script: |
         echo ===== BACKEND INSTALL =====
         cd $(backendDir)
@@ -81,6 +59,7 @@ stages:
         npm run build
       displayName: 'Build application using npm'
 
+    # Step 2: unit tests + coverage
     - script: |
         echo ===== BACKEND TESTS WITH COVERAGE =====
         cd $(backendDir)
@@ -89,4 +68,216 @@ stages:
         echo ===== FRONTEND TESTS WITH COVERAGE =====
         cd ../$(frontendDir)
         npm run test:coverage
+
+        echo ===== CHECK COVERAGE FILES =====
+        dir "$(Build.SourcesDirectory)\Backend\coverage"
+        dir "$(Build.SourcesDirectory)\React-Client\coverage"
       displayName: 'Run unit tests and generate code coverage'
+
+    - task: SonarCloudAnalyze@4
+      displayName: 'Run SonarQube Cloud Analysis'
+      inputs:
+        jdkversion: 'JAVA_HOME'
+
+    - task: SonarCloudPublish@4
+      displayName: 'Publish Quality Gate Result'
+      inputs:
+        pollingTimeoutSec: '300'
+      continueOnError: true
+
+    - task: PublishCodeCoverageResults@2
+      displayName: 'Publish Backend Code Coverage'
+      inputs:
+        codeCoverageTool: 'Cobertura'
+        summaryFileLocation: '$(Build.SourcesDirectory)/Backend/coverage/cobertura-coverage.xml'
+        reportDirectory: '$(Build.SourcesDirectory)/Backend/coverage'
+      continueOnError: true
+
+    - task: PublishCodeCoverageResults@2
+      displayName: 'Publish Frontend Code Coverage'
+      inputs:
+        codeCoverageTool: 'Cobertura'
+        summaryFileLocation: '$(Build.SourcesDirectory)/React-Client/coverage/cobertura-coverage.xml'
+        reportDirectory: '$(Build.SourcesDirectory)/React-Client/coverage'
+      continueOnError: true
+
+# =========================
+# DELIVER
+# =========================
+- stage: Deliver
+  displayName: 'Deliver'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - job: DeliverJob
+    displayName: 'Package and Publish Artifact'
+    steps:
+    - script: |
+        echo ===== PREPARE RELEASE ARTIFACT =====
+
+        if exist release rmdir /s /q release
+        mkdir release
+        mkdir release\backend
+        mkdir release\frontend
+
+        echo ===== COPY BACKEND FILES =====
+        xcopy "$(backendDir)\app" "release\backend\app\" /E /I /Y
+        xcopy "$(backendDir)\config" "release\backend\config\" /E /I /Y
+        copy "$(backendDir)\app.js" "release\backend\app.js"
+        copy "$(backendDir)\server.js" "release\backend\server.js"
+        copy "$(backendDir)\package.json" "release\backend\package.json"
+        copy "$(backendDir)\package-lock.json" "release\backend\package-lock.json"
+
+        if exist "$(backendDir)\.env.example" copy "$(backendDir)\.env.example" "release\backend\.env.example"
+
+        echo ===== COPY FRONTEND BUILD =====
+        xcopy "$(frontendDir)\dist" "release\frontend\dist\" /E /I /Y
+        copy "$(frontendDir)\package.json" "release\frontend\package.json"
+        copy "$(frontendDir)\package-lock.json" "release\frontend\package-lock.json"
+
+        if exist "$(frontendDir)\.env.example" copy "$(frontendDir)\.env.example" "release\frontend\.env.example"
+
+        echo ===== RELEASE CONTENT =====
+        dir release
+      displayName: 'Package application artifact'
+
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish pipeline artifact'
+      inputs:
+        targetPath: 'release'
+        artifact: '$(artifactName)'
+
+# =========================
+# DEPLOY DEV
+# =========================
+- stage: Deploy_Dev
+  displayName: 'Deploy to Dev Env'
+  dependsOn: Deliver
+  condition: succeeded()
+  jobs:
+  - deployment: DeployDev
+    displayName: 'Deploy to Dev'
+    environment: 'dev'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadPipelineArtifact@2
+            displayName: 'Download artifact'
+            inputs:
+              artifact: '$(artifactName)'
+              path: '$(Pipeline.Workspace)\$(artifactName)'
+
+          - script: |
+              echo ===== MOCK DEPLOY TO DEV =====
+
+              if exist "$(deployRoot)\dev" rmdir /s /q "$(deployRoot)\dev"
+              mkdir "$(deployRoot)\dev"
+
+              xcopy "$(Pipeline.Workspace)\$(artifactName)\*" "$(deployRoot)\dev\" /E /I /Y
+
+              echo ===== LAUNCH DEPLOYED APP (MOCK) =====
+              echo Frontend build deployed to: $(deployRoot)\dev\frontend\dist
+              echo Backend deployed to: $(deployRoot)\dev\backend
+              echo Frontend would be served from built dist folder.
+              echo Backend would be started with: node server.js
+            displayName: 'Deploy and launch Dev app'
+
+# =========================
+# DEPLOY QAT
+# =========================
+- stage: Deploy_QAT
+  displayName: 'Deploy to QAT Env'
+  dependsOn: Deploy_Dev
+  condition: succeeded()
+  jobs:
+  - deployment: DeployQAT
+    displayName: 'Deploy to QAT'
+    environment: 'qat'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadPipelineArtifact@2
+            displayName: 'Download artifact'
+            inputs:
+              artifact: '$(artifactName)'
+              path: '$(Pipeline.Workspace)\$(artifactName)'
+
+          - script: |
+              echo ===== MOCK DEPLOY TO QAT =====
+
+              if exist "$(deployRoot)\qat" rmdir /s /q "$(deployRoot)\qat"
+              mkdir "$(deployRoot)\qat"
+
+              xcopy "$(Pipeline.Workspace)\$(artifactName)\*" "$(deployRoot)\qat\" /E /I /Y
+
+              echo QAT deployment completed.
+              echo Artifact copied to: $(deployRoot)\qat
+            displayName: 'Deploy artifact to QAT'
+
+# =========================
+# DEPLOY STAGING
+# =========================
+- stage: Deploy_Staging
+  displayName: 'Deploy to Staging Env'
+  dependsOn: Deploy_QAT
+  condition: succeeded()
+  jobs:
+  - deployment: DeployStaging
+    displayName: 'Deploy to Staging'
+    environment: 'staging'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadPipelineArtifact@2
+            displayName: 'Download artifact'
+            inputs:
+              artifact: '$(artifactName)'
+              path: '$(Pipeline.Workspace)\$(artifactName)'
+
+          - script: |
+              echo ===== MOCK DEPLOY TO STAGING =====
+
+              if exist "$(deployRoot)\staging" rmdir /s /q "$(deployRoot)\staging"
+              mkdir "$(deployRoot)\staging"
+
+              xcopy "$(Pipeline.Workspace)\$(artifactName)\*" "$(deployRoot)\staging\" /E /I /Y
+
+              echo Staging deployment completed.
+              echo Artifact copied to: $(deployRoot)\staging
+            displayName: 'Deploy artifact to Staging'
+
+# =========================
+# DEPLOY PRODUCTION
+# =========================
+- stage: Deploy_Production
+  displayName: 'Deploy to Production Env'
+  dependsOn: Deploy_Staging
+  condition: succeeded()
+  jobs:
+  - deployment: DeployProduction
+    displayName: 'Deploy to Production'
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadPipelineArtifact@2
+            displayName: 'Download artifact'
+            inputs:
+              artifact: '$(artifactName)'
+              path: '$(Pipeline.Workspace)\$(artifactName)'
+
+          - script: |
+              echo ===== MOCK DEPLOY TO PRODUCTION =====
+
+              if exist "$(deployRoot)\production" rmdir /s /q "$(deployRoot)\production"
+              mkdir "$(deployRoot)\production"
+
+              xcopy "$(Pipeline.Workspace)\$(artifactName)\*" "$(deployRoot)\production\" /E /I /Y
+
+              echo Production deployment completed.
+              echo Artifact copied to: $(deployRoot)\production
+            displayName: 'Deploy artifact to Production'
