@@ -13,8 +13,11 @@ import App from './App.jsx';
 import './index.css';
 import { AuthProvider } from './context/AuthContext.jsx';
 
+const graphqlUrl =
+  import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:4000/graphql';
+
 const httpLink = new HttpLink({
-  uri: 'http://localhost:4000/graphql',
+  uri: graphqlUrl,
   credentials: 'include'
 });
 
