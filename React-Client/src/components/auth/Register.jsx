@@ -112,15 +112,17 @@ function Register() {
     }
 
     if (!formData.password) {
-      errors.password = 'Password is required.';
-      isValid = false;
-    } else if (formData.password.length < 8) {
-      errors.password = 'Password must be at least 8 characters long.';
-      isValid = false;
-    } else if (!/[A-Za-z]/.test(formData.password) || !/\d/.test(formData.password)) {
-      errors.password = 'Password must contain at least one letter and one number.';
-      isValid = false;
-    }
+  errors.password = 'Password is required.';
+  isValid = false;
+} else if (formData.password.length < 8) {
+  errors.password = 'Password must be at least 8 characters long.';
+  isValid = false;
+} else if (!/[A-Za-z]/.test(formData.password) || !/\d/.test(formData.password)) {
+  errors.password =
+    'Password must contain at least one letter and one number.';
+  isValid = false;
+}
+    
 
     if (!formData.confirmPassword) {
       errors.confirmPassword = 'Please confirm your password.';
