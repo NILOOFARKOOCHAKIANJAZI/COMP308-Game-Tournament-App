@@ -54,7 +54,7 @@ stages:
         pollingTimeoutSec: '300'
 
 # =========================
-# STAGE 2: Build
+# STAGES: Build
 # Rubric requires:
 # - Build stage
 # - single job
