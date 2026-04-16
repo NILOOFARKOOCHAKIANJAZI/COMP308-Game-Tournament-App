@@ -1,1 +1,92 @@
-# yaml script for his project will go here IN FUTURE
+trigger:
+- main
+
+pr:
+- main
+
+pool:
+  name: 'Niloofar-COMP367-FinalProject'
+  demands:
+  - Agent.Name -equals LAPTOP-QJ83OVCB
+
+variables:
+  backendDir: 'Backend'
+  frontendDir: 'React-Client'
+  sonarServiceConnection: 'FinalProject-Group15-COMP367'
+  sonarOrganization: 'niloofarkoochakianjazi'
+  sonarProjectKey: 'NILOOFARKOOCHAKIANJAZI_COMP308-Game-Tournament-App'
+  sonarProjectName: 'COMP308-Game-Tournament-App'
+
+stages:
+
+# =========================
+# STAGE 1: Static Analysis
+# =========================
+- stage: StaticAnalysis
+  displayName: 'Static Code Analysis'
+  jobs:
+  - job: SonarScan
+    displayName: 'Run SonarQube Cloud Analysis'
+    steps:
+    - task: SonarCloudPrepare@4
+      displayName: 'Prepare SonarQube Cloud Analysis'
+      inputs:
+        SonarCloud: '$(sonarServiceConnection)'
+        organization: '$(sonarOrganization)'
+        scannerMode: 'cli'
+        configMode: 'manual'
+        cliProjectKey: '$(sonarProjectKey)'
+        cliProjectName: '$(sonarProjectName)'
+        cliSources: '.'
+        extraProperties: |
+          sonar.sourceEncoding=UTF-8
+          sonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/**,**/.git/**
+          sonar.javascript.lcov.reportPaths=Backend/coverage/lcov.info,React-Client/coverage/lcov.info
+
+    - task: SonarCloudAnalyze@4
+      displayName: 'Run SonarQube Cloud Analysis'
+      inputs:
+        jdkversion: 'JAVA_HOME'
+
+    - task: SonarCloudPublish@4
+      displayName: 'Publish Quality Gate Result'
+      inputs:
+        pollingTimeoutSec: '300'
+
+# =========================
+# STAGES: Build
+# Rubric requires:
+# - Build stage
+# - single job
+# - two steps
+# =========================
+- stage: Build
+  displayName: 'Build'
+  dependsOn: StaticAnalysis
+  condition: succeeded()
+  jobs:
+  - job: BuildJob
+    displayName: 'Compile and Test'
+    steps:
+    - script: |
+        echo ===== BACKEND INSTALL =====
+        cd $(backendDir)
+        npm ci
+
+        echo ===== FRONTEND INSTALL =====
+        cd ../$(frontendDir)
+        npm ci
+
+        echo ===== FRONTEND BUILD =====
+        npm run build
+      displayName: 'Build application using npm'
+
+    - script: |
+        echo ===== BACKEND TESTS WITH COVERAGE =====
+        cd $(backendDir)
+        npm run test:coverage
+
+        echo ===== FRONTEND TESTS WITH COVERAGE =====
+        cd ../$(frontendDir)
+        npm run test:coverage
+      displayName: 'Run unit tests and generate code coverage'
