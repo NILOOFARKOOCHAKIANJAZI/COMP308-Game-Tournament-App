@@ -38,6 +38,7 @@
     "app/helpers/**/*.js",
     "app/models/**/*.js",
     "!config/env/**/*.js"
-  ]
+  ],
+  "coverageReporters": ["text", "lcov", "cobertura", "html"]
 }
 }

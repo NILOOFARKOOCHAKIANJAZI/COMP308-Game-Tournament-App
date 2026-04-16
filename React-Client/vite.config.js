@@ -10,7 +10,7 @@ export default defineConfig({
     include: ['src/**/*.test.js', 'src/**/*.test.jsx'],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html'],
+      reporter: ['text', 'html', 'lcov', 'cobertura'],
       include: ['src/utils/config.js', 'src/context/AuthContext.jsx'],
       exclude: ['src/main.jsx']
     }
