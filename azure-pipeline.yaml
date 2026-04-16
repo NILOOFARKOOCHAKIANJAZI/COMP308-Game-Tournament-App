@@ -32,13 +32,13 @@ stages:
       displayName: 'Prepare SonarQube Cloud Analysis'
       inputs:
         SonarCloud: '$(sonarServiceConnection)'
+        organization: '$(sonarOrganization)'
         scannerMode: 'cli'
         configMode: 'manual'
         cliProjectKey: '$(sonarProjectKey)'
         cliProjectName: '$(sonarProjectName)'
         cliSources: '.'
         extraProperties: |
-          sonar.organization=$(sonarOrganization)
           sonar.sourceEncoding=UTF-8
           sonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/**,**/.git/**
           sonar.javascript.lcov.reportPaths=Backend/coverage/lcov.info,React-Client/coverage/lcov.info
@@ -68,8 +68,6 @@ stages:
   - job: BuildJob
     displayName: 'Compile and Test'
     steps:
-
-    # Step 1: compile / build
     - script: |
         echo ===== BACKEND INSTALL =====
         cd $(backendDir)
@@ -83,7 +81,6 @@ stages:
         npm run build
       displayName: 'Build application using npm'
 
-    # Step 2: unit tests + coverage
     - script: |
         echo ===== BACKEND TESTS WITH COVERAGE =====
         cd $(backendDir)
