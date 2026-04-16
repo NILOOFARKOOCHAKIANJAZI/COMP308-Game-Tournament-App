@@ -113,10 +113,13 @@ function CreateUser() {
     }
 
     if (!formData.password) {
-      nextFieldErrors.password = 'Password is required.';
-    } else if (formData.password.length < 6) {
-      nextFieldErrors.password = 'Password must be at least 6 characters long.';
-    }
+  nextFieldErrors.password = 'Password is required.';
+} else if (formData.password.length < 8) {
+  nextFieldErrors.password = 'Password must be at least 8 characters long.';
+} else if (!/[A-Za-z]/.test(formData.password) || !/\d/.test(formData.password)) {
+  nextFieldErrors.password =
+    'Password must contain at least one letter and one number.';
+}
 
     if (!formData.confirmPassword) {
       nextFieldErrors.confirmPassword = 'Please confirm the password.';
