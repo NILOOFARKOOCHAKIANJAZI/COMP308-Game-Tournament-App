@@ -12,12 +12,10 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import App from './App.jsx';
 import './index.css';
 import { AuthProvider } from './context/AuthContext.jsx';
-
-const graphqlUrl =
-  import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:4000/graphql';
+import { getGraphqlUrl } from './utils/config.js';
 
 const httpLink = new HttpLink({
-  uri: graphqlUrl,
+  uri: getGraphqlUrl(),
   credentials: 'include'
 });
 
