@@ -23,14 +23,15 @@ variables:
 stages:
 
 # =========================
-# STATIC ANALYSIS
+# BUILD + TEST + SONAR
 # =========================
-- stage: StaticAnalysis
-  displayName: 'Static Analysis'
+- stage: Build
+  displayName: 'Build'
   jobs:
-  - job: SonarScan
-    displayName: 'Run SonarQube Cloud Analysis'
+  - job: BuildJob
+    displayName: 'Compile, Test, and Analyze'
     steps:
+
     - task: SonarCloudPrepare@4
       displayName: 'Prepare SonarQube Cloud Analysis'
       inputs:
@@ -46,6 +47,69 @@ stages:
           sonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/**,**/.git/**
           sonar.javascript.lcov.reportPaths=$(Build.SourcesDirectory)/Backend/coverage/lcov.info,$(Build.SourcesDirectory)/React-Client/coverage/lcov.info
 
+    - script: |
+        echo ===== SHOW SOURCE ROOT =====
+        echo Build.SourcesDirectory = $(Build.SourcesDirectory)
+        dir "$(Build.SourcesDirectory)"
+
+        echo ===== BACKEND INSTALL =====
+        cd /d "$(Build.SourcesDirectory)\$(backendDir)"
+        call npm ci
+        if errorlevel 1 exit /b 1
+
+        echo ===== FRONTEND INSTALL =====
+        cd /d "$(Build.SourcesDirectory)\$(frontendDir)"
+        dir
+        call npm ci
+        if errorlevel 1 exit /b 1
+
+        echo ===== FRONTEND BUILD =====
+        call npm run build
+        if errorlevel 1 exit /b 1
+
+        echo ===== VERIFY FRONTEND DIST =====
+        if exist "$(Build.SourcesDirectory)\$(frontendDir)\dist" (
+          echo SUCCESS: dist folder found
+          dir "$(Build.SourcesDirectory)\$(frontendDir)\dist"
+        ) else (
+          echo ERROR: dist folder was not created
+          echo ===== FRONTEND DIRECTORY CONTENT =====
+          dir "$(Build.SourcesDirectory)\$(frontendDir)"
+          exit /b 1
+        )
+      displayName: 'Build application using npm'
+
+    - script: |
+        echo ===== BACKEND TESTS WITH COVERAGE =====
+        cd /d "$(Build.SourcesDirectory)\$(backendDir)"
+        call npm run test:coverage
+        if errorlevel 1 exit /b 1
+
+        echo ===== FRONTEND TESTS WITH COVERAGE =====
+        cd /d "$(Build.SourcesDirectory)\$(frontendDir)"
+        call npm run test:coverage
+        if errorlevel 1 exit /b 1
+
+        echo ===== CHECK COVERAGE FILES =====
+        if exist "$(Build.SourcesDirectory)\Backend\coverage\lcov.info" (
+          echo Backend lcov found
+          dir "$(Build.SourcesDirectory)\Backend\coverage"
+        ) else (
+          echo ERROR: Backend coverage lcov.info not found
+          dir "$(Build.SourcesDirectory)\Backend"
+          exit /b 1
+        )
+
+        if exist "$(Build.SourcesDirectory)\React-Client\coverage\lcov.info" (
+          echo Frontend lcov found
+          dir "$(Build.SourcesDirectory)\React-Client\coverage"
+        ) else (
+          echo ERROR: Frontend coverage lcov.info not found
+          dir "$(Build.SourcesDirectory)\React-Client"
+          exit /b 1
+        )
+      displayName: 'Run unit tests and generate code coverage'
+
     - task: SonarCloudAnalyze@4
       displayName: 'Analyze with SonarQube Cloud'
       inputs:
@@ -57,55 +121,11 @@ stages:
         pollingTimeoutSec: '300'
       continueOnError: true
 
-# =========================
-# BUILD
-# =========================
-- stage: Build
-  displayName: 'Build'
-  dependsOn: StaticAnalysis
-  condition: succeeded()
-  jobs:
-  - job: BuildJob
-    displayName: 'Compile and Test'
-    steps:
-
-    # Step 1: build using project build tool
-    - script: |
-        echo ===== BACKEND INSTALL =====
-        cd $(backendDir)
-        npm ci
-
-        echo ===== FRONTEND INSTALL =====
-        cd ../$(frontendDir)
-        npm ci
-
-        echo ===== FRONTEND BUILD =====
-        npm run build
-
-        echo ===== VERIFY FRONTEND DIST =====
-        dir "$(Build.SourcesDirectory)\$(frontendDir)\dist"
-      displayName: 'Build application using npm'
-
     - task: PublishPipelineArtifact@1
       displayName: 'Publish frontend dist artifact'
       inputs:
         targetPath: '$(Build.SourcesDirectory)\$(frontendDir)\dist'
         artifact: '$(frontendDistArtifact)'
-
-    # Step 2: unit tests + code coverage
-    - script: |
-        echo ===== BACKEND TESTS WITH COVERAGE =====
-        cd $(backendDir)
-        npm run test:coverage
-
-        echo ===== FRONTEND TESTS WITH COVERAGE =====
-        cd ../$(frontendDir)
-        npm run test:coverage
-
-        echo ===== CHECK COVERAGE FILES =====
-        dir "$(Build.SourcesDirectory)\Backend\coverage"
-        dir "$(Build.SourcesDirectory)\React-Client\coverage"
-      displayName: 'Run unit tests and generate code coverage'
 
 # =========================
 # DELIVER
@@ -133,14 +153,14 @@ stages:
         mkdir release\frontend
 
         echo ===== COPY BACKEND FILES =====
-        xcopy "$(backendDir)\app" "release\backend\app\" /E /I /Y
-        xcopy "$(backendDir)\config" "release\backend\config\" /E /I /Y
-        copy "$(backendDir)\app.js" "release\backend\app.js"
-        copy "$(backendDir)\server.js" "release\backend\server.js"
-        copy "$(backendDir)\package.json" "release\backend\package.json"
-        copy "$(backendDir)\package-lock.json" "release\backend\package-lock.json"
+        xcopy "$(Build.SourcesDirectory)\$(backendDir)\app" "release\backend\app\" /E /I /Y
+        xcopy "$(Build.SourcesDirectory)\$(backendDir)\config" "release\backend\config\" /E /I /Y
+        copy "$(Build.SourcesDirectory)\$(backendDir)\app.js" "release\backend\app.js"
+        copy "$(Build.SourcesDirectory)\$(backendDir)\server.js" "release\backend\server.js"
+        copy "$(Build.SourcesDirectory)\$(backendDir)\package.json" "release\backend\package.json"
+        copy "$(Build.SourcesDirectory)\$(backendDir)\package-lock.json" "release\backend\package-lock.json"
 
-        if exist "$(backendDir)\.env.example" copy "$(backendDir)\.env.example" "release\backend\.env.example"
+        if exist "$(Build.SourcesDirectory)\$(backendDir)\.env.example" copy "$(Build.SourcesDirectory)\$(backendDir)\.env.example" "release\backend\.env.example"
 
         echo ===== COPY FRONTEND BUILD =====
         if exist "$(Pipeline.Workspace)\$(frontendDistArtifact)" (
@@ -150,13 +170,14 @@ stages:
           exit /b 1
         )
 
-        copy "$(frontendDir)\package.json" "release\frontend\package.json"
-        copy "$(frontendDir)\package-lock.json" "release\frontend\package-lock.json"
+        copy "$(Build.SourcesDirectory)\$(frontendDir)\package.json" "release\frontend\package.json"
+        copy "$(Build.SourcesDirectory)\$(frontendDir)\package-lock.json" "release\frontend\package-lock.json"
 
-        if exist "$(frontendDir)\.env.example" copy "$(frontendDir)\.env.example" "release\frontend\.env.example"
+        if exist "$(Build.SourcesDirectory)\$(frontendDir)\.env.example" copy "$(Build.SourcesDirectory)\$(frontendDir)\.env.example" "release\frontend\.env.example"
 
         echo ===== VERIFY RELEASE CONTENT =====
         dir release
+        dir release\backend
         dir release\frontend
         dir release\frontend\dist
       displayName: 'Package application artifact'
@@ -198,12 +219,13 @@ stages:
 
               echo ===== VERIFY DEV DEPLOYMENT =====
               dir "$(deployRoot)\dev"
+              dir "$(deployRoot)\dev\backend"
               dir "$(deployRoot)\dev\frontend"
               dir "$(deployRoot)\dev\frontend\dist"
 
               echo ===== CREATE MOCK DEV ENV FILE =====
               if exist "$(deployRoot)\dev\backend" (
-                cd "$(deployRoot)\dev\backend"
+                cd /d "$(deployRoot)\dev\backend"
                 (
                   echo NODE_ENV=development
                   echo PORT=4000
@@ -218,7 +240,7 @@ stages:
 
               echo ===== LAUNCH DEPLOYED APP (MOCK) =====
               if exist "$(deployRoot)\dev\backend\server.js" (
-                cd "$(deployRoot)\dev\backend"
+                cd /d "$(deployRoot)\dev\backend"
                 start "Mock Backend Dev" cmd /k node server.js
               )
 
@@ -259,6 +281,9 @@ stages:
 
               xcopy "$(Pipeline.Workspace)\$(artifactName)\*" "$(deployRoot)\qat\" /E /I /Y
 
+              echo ===== VERIFY QAT DEPLOYMENT =====
+              dir "$(deployRoot)\qat"
+
               echo QAT deployment completed.
               echo Artifact copied to: $(deployRoot)\qat
             displayName: 'Deploy artifact to QAT'
@@ -292,6 +317,9 @@ stages:
 
               xcopy "$(Pipeline.Workspace)\$(artifactName)\*" "$(deployRoot)\staging\" /E /I /Y
 
+              echo ===== VERIFY STAGING DEPLOYMENT =====
+              dir "$(deployRoot)\staging"
+
               echo Staging deployment completed.
               echo Artifact copied to: $(deployRoot)\staging
             displayName: 'Deploy artifact to Staging'
@@ -324,6 +352,9 @@ stages:
               mkdir "$(deployRoot)\production"
 
               xcopy "$(Pipeline.Workspace)\$(artifactName)\*" "$(deployRoot)\production\" /E /I /Y
+
+              echo ===== VERIFY PRODUCTION DEPLOYMENT =====
+              dir "$(deployRoot)\production"
 
               echo Production deployment completed.
               echo Artifact copied to: $(deployRoot)\production
