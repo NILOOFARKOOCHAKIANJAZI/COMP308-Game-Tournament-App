@@ -22,22 +22,12 @@ const createExpressApp = async () => {
   // -----------------------------
   // CORS configuration
   // -----------------------------
- const allowedOrigins = [
-  "http://localhost:5173",
-  "https://agreeable-plant-d0d72e10f7.azurestaticapps.net"
-   "http://localhost:3000"
-];
-
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true
-}));
+app.use(
+    cors({
+      origin: config.clientURL,
+      credentials: true
+    })
+  );
 
   // -----------------------------
   // Simple test route
