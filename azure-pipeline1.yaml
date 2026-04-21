@@ -240,16 +240,8 @@ stages:
 
               echo ===== LAUNCH DEPLOYED APP (MOCK) =====
               if exist "$(deployRoot)\dev\backend\server.js" (
-                cd /d "$(deployRoot)\dev\backend"
-                start /B cmd /c "node server.js > backend.log 2>&1"
-                timeout /t 8 /nobreak > nul
-
-                if exist backend.log (
-                  echo ===== BACKEND LOG =====
-                  type backend.log
-                ) else (
-                  echo WARNING: backend.log was not created
-                )
+                powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+                  "$p = Start-Process node -ArgumentList 'server.js' -WorkingDirectory '$(deployRoot)\dev\backend' -RedirectStandardOutput '$(deployRoot)\dev\backend\backend.log' -RedirectStandardError '$(deployRoot)\dev\backend\backend.err.log' -PassThru; Start-Sleep -Seconds 8; if (Test-Path '$(deployRoot)\dev\backend\backend.log') { Get-Content '$(deployRoot)\dev\backend\backend.log' }; if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }"
               ) else (
                 echo ERROR: Backend server.js not found
                 exit /b 1
@@ -265,7 +257,6 @@ stages:
 
               echo Dev deployment completed successfully.
             displayName: 'Deploy and launch Dev app'
-
 # =========================
 # DEPLOY QAT
 # =========================
