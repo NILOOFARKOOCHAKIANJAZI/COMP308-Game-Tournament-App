@@ -17,6 +17,7 @@ variables:
   sonarProjectKey: 'NILOOFARKOOCHAKIANJAZI_COMP308-Game-Tournament-App'
   sonarProjectName: 'COMP308-Game-Tournament-App'
   artifactName: 'comp308-game-tournament-app-v2'
+  frontendDistArtifact: 'frontend-dist'
   deployRoot: 'D:\agent\mock-deployments-V2'
 
 stages:
@@ -85,6 +86,12 @@ stages:
         dir "$(Build.SourcesDirectory)\$(frontendDir)\dist"
       displayName: 'Build application using npm'
 
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish frontend dist artifact'
+      inputs:
+        targetPath: '$(Build.SourcesDirectory)\$(frontendDir)\dist'
+        artifact: '$(frontendDistArtifact)'
+
     # Step 2: unit tests + code coverage
     - script: |
         echo ===== BACKEND TESTS WITH COVERAGE =====
@@ -111,6 +118,12 @@ stages:
   - job: DeliverJob
     displayName: 'Package and Publish Artifact'
     steps:
+    - task: DownloadPipelineArtifact@2
+      displayName: 'Download frontend dist artifact'
+      inputs:
+        artifact: '$(frontendDistArtifact)'
+        path: '$(Pipeline.Workspace)\$(frontendDistArtifact)'
+
     - script: |
         echo ===== PREPARE RELEASE ARTIFACT =====
 
@@ -130,10 +143,10 @@ stages:
         if exist "$(backendDir)\.env.example" copy "$(backendDir)\.env.example" "release\backend\.env.example"
 
         echo ===== COPY FRONTEND BUILD =====
-        if exist "$(frontendDir)\dist" (
-          xcopy "$(frontendDir)\dist" "release\frontend\dist\" /E /I /Y
+        if exist "$(Pipeline.Workspace)\$(frontendDistArtifact)" (
+          xcopy "$(Pipeline.Workspace)\$(frontendDistArtifact)" "release\frontend\dist\" /E /I /Y
         ) else (
-          echo ERROR: Frontend dist folder not found
+          echo ERROR: Downloaded frontend dist artifact not found
           exit /b 1
         )
 
