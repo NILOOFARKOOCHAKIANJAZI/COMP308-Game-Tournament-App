@@ -1,5 +1,5 @@
 export const resolveGraphqlUrl = (envUrl) => {
-  return envUrl || 'http://localhost:4000/graphql';
+  return envUrl || 'https://comp308-backend-d0hec7hbg0dye6es.eastus2-01.azurewebsites.net/graphql';
 };
 
 export const getGraphqlUrl = () => {
