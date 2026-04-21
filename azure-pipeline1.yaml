@@ -241,15 +241,29 @@ stages:
               echo ===== LAUNCH DEPLOYED APP (MOCK) =====
               if exist "$(deployRoot)\dev\backend\server.js" (
                 cd /d "$(deployRoot)\dev\backend"
-                start "Mock Backend Dev" cmd /k node server.js
+                start /B cmd /c "node server.js > backend.log 2>&1"
+                timeout /t 8 /nobreak > nul
+
+                if exist backend.log (
+                  echo ===== BACKEND LOG =====
+                  type backend.log
+                ) else (
+                  echo WARNING: backend.log was not created
+                )
+              ) else (
+                echo ERROR: Backend server.js not found
+                exit /b 1
               )
 
+              echo ===== VERIFY FRONTEND ENTRY =====
               if exist "$(deployRoot)\dev\frontend\dist\index.html" (
-                start "" "$(deployRoot)\dev\frontend\dist\index.html"
+                echo Frontend entry found: $(deployRoot)\dev\frontend\dist\index.html
+              ) else (
+                echo ERROR: Frontend index.html not found
+                exit /b 1
               )
 
-              echo Frontend launched from: $(deployRoot)\dev\frontend\dist\index.html
-              echo Backend launched from: $(deployRoot)\dev\backend\server.js
+              echo Dev deployment completed successfully.
             displayName: 'Deploy and launch Dev app'
 
 # =========================
